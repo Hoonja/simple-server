@@ -10,10 +10,8 @@
   "author": "jhchoi@maukistudio.com",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.16.3"
+    "express": "^4.16.3",
+    "socket.io": "^2.1.1"
   },
-  "devDependencies": {
-    "node-hot-loader": "^1.11.1",
-    "webpack": "^4.17.2"
-  }
+  "devDependencies": {}
 }

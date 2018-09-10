@@ -1,5 +1,5 @@
-export default {
+module.export = {
   output: {
-    filename: ['index.js', 'index.html']
+    filename: 'index.js'
   }
 }
