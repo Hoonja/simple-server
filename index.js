@@ -8,6 +8,11 @@ var Type = {
   MSG: 'MSG'
 };
 
+var Cmd = {
+  ROOM: 'ROOM',
+  LOG: 'LOG'
+};
+
 app.get('/', function (req, res) {
   res.sendFile(__dirname + '/index.html');
 });
@@ -19,6 +24,7 @@ io.on('connection', function (socket) {
 
   socket.on('disconnect', function () {
     console.log('user disconnected');
+    removeUser(socket.id);
   });
 
   socket.on(Type.CHAT, function (from, msg) {
@@ -40,3 +46,8 @@ io.on('connection', function (socket) {
 http.listen(3000, function () {
   console.log('listening on *:3000');
 });
+
+//  functions..
+function removeUser(id) {
+  console.log('User ' + id + ' is removed.');
+}
