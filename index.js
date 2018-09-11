@@ -34,13 +34,7 @@ io.on('connection', function (socket) {
     socket.broadcast.emit(Type.CHAT, msg);
   });
 
-  socket.on(Type.MSG, function (msg) {
-    console.log('MSG : ' + JSON.stringify(msg));
-    socket.join(msg.roomId, () => {
-      let rooms = Object.keys(socket.rooms);
-      console.log('socket.rooms: ' + JSON.stringify(rooms));
-    })
-  });
+  socket.on(Type.MSG, function (msg) { handleMsg(socket, msg); });
 });
 
 http.listen(3000, function () {
@@ -50,4 +44,19 @@ http.listen(3000, function () {
 //  functions..
 function removeUser(id) {
   console.log('User ' + id + ' is removed.');
+}
+
+function handleMsg(socket, msg) {
+  // console.log('MSG : ' + JSON.stringify(msg));
+  switch (msg.cmd) {
+    case Cmd.ROOM:
+      socket.join(msg.data.room.id, () => {
+        let rooms = Object.keys(socket.rooms);
+        console.log('socket.rooms: ' + JSON.stringify(rooms));
+      });
+      break;
+    default:
+      console.warn('handleMsg: the msg was unhandled [msg.cmd: ' + msg.cmd + ']');
+      break;
+  }  
 }
