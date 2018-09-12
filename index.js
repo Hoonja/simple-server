@@ -119,8 +119,6 @@ function processRoomMsg(socket, data) {
 function addMsgQueue(socket, msg) {
   console.log('큐 인덱스 ' + curQIndex + '에 메세지 추가');
   qRequest[curQIndex].push({ socket: socket, msg: msg });
-  //  TODO dummy
-  qRequest[curQIndex].push({ socket: socket, msg: {cmd: 'dummy'} });
 }
 
 function getRoomInfo(roomId, width, height) {
@@ -226,7 +224,6 @@ function processBlock() {
   // }
   // console.log('Length of CONQUER msg: ' + qConquer.length);
 
-  //  TODO  공격비용이 높은 것에 대해 처리하고..
   var cellIndex = -1;
   var roomId = '---';
   var msg;
@@ -275,6 +272,8 @@ function processBlock() {
       });      
     }    
   }
+
+  //  TODO  성공한 유저의 돈 차감하고 업데이트
 
   qRequest[prevQIndex] = [];
 }
