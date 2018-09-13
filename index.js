@@ -20,10 +20,11 @@ var Res = {
   CONQUER_CELL_SUCCESS: 'CONQUER_CELL_SUCCESS',
   CONQUER_CELL_FAILED: 'CONQUER_CELL_FAILED',
   UPDATE_CELL: 'UPDATE_CELL',
+  UPDATE_USER: 'UPDATE_USER',
   LOG: 'LOG'
 };
 
-var BLOCK_INTERVAL = 5000;
+var BLOCK_INTERVAL = 15000;
 
 var users = [];
 var rooms = [];
@@ -41,7 +42,9 @@ io.on('connection', function (socket) {
 
   socket.on('disconnect', function () {
     var user = removeUser(socket);
-    io.emit(Type.MSG, { cmd: Cmd.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
+    if (user) {
+      io.emit(Type.MSG, { cmd: Cmd.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
+    }    
   });
 
   socket.on(Type.CHAT, function (data) { handleChat(socket, data); });
@@ -122,11 +125,14 @@ function addMsgQueue(socket, msg) {
 }
 
 function getRoomInfo(roomId, width, height) {
+  console.log(roomId + '번 방 검색..');
   for (var i = 0; i < rooms.length; i++) {
     if (rooms[i].id === roomId) {
+      console.log(roomId + '번 방 검색 성공: ' + JSON.stringify(rooms[i]));
       return rooms[i];
     }
   }
+  console.log(roomId + '번 방이 존재하지 않아, 새로 생성(width: ' + width + ', height: ' + height + ')');
 
   function initCells(width, height) {
     var cells = [];
@@ -258,22 +264,31 @@ function processBlock() {
           occupied: true
         };
         console.log('전체 방에 셀 정보 업데이트: ' + msg.roomId);
+        room.value += cell.cost;
+        console.log('현재 방 정보 :' + JSON.stringify(room));
         socket.to(msg.roomId).emit(Type.MSG, {
           cmd: Res.UPDATE_CELL,
-          data: room.cells[cell.id]
+          data: {
+            cell: room.cells[cell.id],
+            roomValue: room.value
+          }
         });
+        
         res = Res.CONQUER_CELL_SUCCESS;
       } else if (cellIndex === cell.id) { //  나머지는 모두 실패 처리
         res = Res.CONQUER_CELL_FAILED;
       }
+      
       socket.emit(Type.MSG, {
         cmd: res,
-        data: room.cells[cell.id]
-      });      
-    }    
-  }
+        data: {
+          cell: room.cells[cell.id]
+        }
+      });
 
-  //  TODO  성공한 유저의 돈 차감하고 업데이트
+      //  TODO  방이 모두 정복 되었다면.. 종료 모드로 간다
+    }
+  }
 
   qRequest[prevQIndex] = [];
 }
