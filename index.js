@@ -21,10 +21,13 @@ var Res = {
   CONQUER_CELL_FAILED: 'CONQUER_CELL_FAILED',
   UPDATE_CELL: 'UPDATE_CELL',
   UPDATE_USER: 'UPDATE_USER',
+  GOTO_FINAL: 'GOTO_FINAL',
+  GAME_OVER: 'GAME_OVER',
   LOG: 'LOG'
 };
 
-var BLOCK_INTERVAL = 15000;
+var BLOCK_INTERVAL = 5000;
+var LEFT_TURN = 5;
 
 var users = [];
 var rooms = [];
@@ -147,7 +150,9 @@ function getRoomInfo(roomId, width, height) {
     users: [],
     width: width,
     height: height,
-    value: 0
+    value: 0,
+    isCompleted: false,
+    turnsLeft: -1
   });
   return rooms[rooms.length - 1];
 }
@@ -252,7 +257,7 @@ function processBlock() {
     });
     // console.log('Found room:' + JSON.stringify(room));
 
-    if (room) {
+    if (room && !room.isCompleted) {
       if (cellIndex !== cell.id) { //  정렬된 배열중 각 cell의 첫 요소가 공격에 성공한 요청
         cellIndex = cell.id;
         room.cells[cell.id] = {
@@ -284,10 +289,54 @@ function processBlock() {
         data: {
           cell: room.cells[cell.id]
         }
-      });
-
-      //  TODO  방이 모두 정복 되었다면.. 종료 모드로 간다
+      });      
     }
+  }
+
+  for (var i = 0; i < rooms.length; i++){
+    if (rooms[i].isCompleted) {
+      continue;
+    }
+    
+    if (rooms[i].turnsLeft === -1) {
+      var restCell = rooms[i].cells.find(function (item) {
+        return item.occupied === false;
+      });
+      if (!restCell) {
+        rooms[i].turnsLeft = LEFT_TURN;
+        io.emit(Type.MSG, {
+          cmd: Res.GOTO_FINAL,
+          data: {
+            room: rooms[i]
+          }
+        });        
+      }      
+    } else if (rooms[i].turnsLeft === 0) {
+      io.emit(Type.MSG, {
+        cmd: Res.GAME_OVER,
+        data: {
+          room: rooms[i]
+        }
+      });
+    } else {
+      rooms[i].turnsLeft--;
+      if (rooms[i].turnsLeft === 0) {
+        io.emit(Type.MSG, {
+          cmd: Res.GAME_OVER,
+          data: {
+            room: rooms[i]
+          }
+        });
+        rooms[i].isCompleted = true;
+      } else {
+        io.emit(Type.MSG, {
+          cmd: Res.GOTO_FINAL,
+          data: {
+            room: rooms[i]
+          }
+        });
+      }      
+    }    
   }
 
   qRequest[prevQIndex] = [];
