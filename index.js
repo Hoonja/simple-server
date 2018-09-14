@@ -47,7 +47,7 @@ io.on('connection', function (socket) {
     var user = removeUser(socket);
     if (user) {
       io.emit(Type.MSG, { cmd: Cmd.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
-    }    
+    }
   });
 
   socket.on(Type.CHAT, function (data) { handleChat(socket, data); });
@@ -96,7 +96,7 @@ function handleMsg(socket, msg) {
       // console.warn('handleMsg: the msg was unhandled [msg.cmd: ' + msg.cmd + ']: ' + JSON.stringify(msg));
       console.warn('handleMsg: the msg was unhandled [msg.cmd: ' + msg.cmd + ']');
       break;
-  }  
+  }
 }
 
 function processRoomMsg(socket, data) {
@@ -114,7 +114,7 @@ function processRoomMsg(socket, data) {
       cmd: Cmd.ROOM_NEWUSER,
       data: data
     });
-    
+
     socket.emit(Type.MSG, {
       cmd: Res.ROOM_INFO,
       data: { room: room }
@@ -138,6 +138,12 @@ function getRoomInfo(roomId, width, height) {
   console.log(roomId + '번 방이 존재하지 않아, 새로 생성(width: ' + width + ', height: ' + height + ')');
 
   function initCells(width, height) {
+    if (typeof width === 'string') {
+      width = parseInt(width, 10);
+    }
+    if (typeof height === 'string') {
+      height = parseInt(height, 10);
+    }
     var cells = [];
     for (var i = 0; i < width * height; i++) {
       cells.push({ occupied: false });
@@ -208,11 +214,11 @@ function processBlock() {
   var prevQIndex = curQIndex;
   curQIndex = curQIndex === 0 ? 1 : 0;
   console.log('블록 정보가 갱신됩니다.[처리할 큐인덱스: ' + prevQIndex + ', Length: ' + qRequest[prevQIndex].length + ']');
-  
-  var qConquer = qRequest[prevQIndex].filter(function(item) {
+
+  var qConquer = qRequest[prevQIndex].filter(function (item) {
     return item.msg.cmd === Cmd.CONQUER_CELL;
   });
-  qConquer.sort(function(a, b) {
+  qConquer.sort(function (a, b) {
     if (a.msg.roomId === b.msg.roomId) {
       if (a.msg.data.id === b.msg.data.id) {
         return b.msg.data.cost - a.msg.data.cost;
@@ -227,7 +233,7 @@ function processBlock() {
       } else {
         return -1;
       }
-    }    
+    }
   });
   //  정렬 잘 되었나 확인하기 위한 테스트 로그
   // for (var i = 0; i < qConquer.length; i++) {
@@ -242,17 +248,17 @@ function processBlock() {
   var cell;
   var res;
   var room;
-  for (var i = 0; i < qConquer.length; i++){
+  for (var i = 0; i < qConquer.length; i++) {
     msg = qConquer[i].msg;
     socket = qConquer[i].socket;
     cell = msg.data;
-    
+
     if (roomId !== msg.roomId) {
       roomId = msg.roomId;
       cellIndex = -1;
     }
 
-    room = rooms.find(function(item) {
+    room = rooms.find(function (item) {
       return item.id === roomId;
     });
     // console.log('Found room:' + JSON.stringify(room));
@@ -278,26 +284,26 @@ function processBlock() {
             roomValue: room.value
           }
         });
-        
+
         res = Res.CONQUER_CELL_SUCCESS;
       } else if (cellIndex === cell.id) { //  나머지는 모두 실패 처리
         res = Res.CONQUER_CELL_FAILED;
       }
-      
+
       socket.emit(Type.MSG, {
         cmd: res,
         data: {
           cell: room.cells[cell.id]
         }
-      });      
+      });
     }
   }
 
-  for (var i = 0; i < rooms.length; i++){
+  for (var i = 0; i < rooms.length; i++) {
     if (rooms[i].isCompleted) {
       continue;
     }
-    
+
     if (rooms[i].turnsLeft === -1) {
       var restCell = rooms[i].cells.find(function (item) {
         return item.occupied === false;
@@ -309,8 +315,8 @@ function processBlock() {
           data: {
             room: rooms[i]
           }
-        });        
-      }      
+        });
+      }
     } else if (rooms[i].turnsLeft === 0) {
       io.emit(Type.MSG, {
         cmd: Res.GAME_OVER,
@@ -335,8 +341,8 @@ function processBlock() {
             room: rooms[i]
           }
         });
-      }      
-    }    
+      }
+    }
   }
 
   qRequest[prevQIndex] = [];
