@@ -28,6 +28,7 @@ var Res = {
 
 var BLOCK_INTERVAL = 5000;
 var LEFT_TURN = 5;
+var DEFAULT_PORT = '3000';
 
 var users = [];
 var rooms = [];
@@ -61,13 +62,29 @@ curQIndex = 0;
 
 setInterval(processBlock, BLOCK_INTERVAL);
 
-http.listen(3000, function () {
-  console.log('listening on *:3000');
+http.listen(getPortNumber(), function () {
+  console.log('listening on *:', getPortNumber());
 });
 
+console.log('process.argv', JSON.stringify(process.argv));
 ////////////////////////////////////////////////////////////////////////////////
 //  Operational Functions
 ////////////////////////////////////////////////////////////////////////////////
+function getPortNumber() {
+  var port = process.argv.find(function (item) {
+    return item.indexOf('--port') >= 0;
+  });
+
+  if (port) {
+    port = port.split('=')[1];
+    console.log('Custom listening port[' + port + '] will be used.');
+  } else {
+    port = DEFAULT_PORT;
+    console.log('Default listening port[' + port + '] will be used.');
+  }
+  return parseInt(port, 10);
+}
+
 function handleChat(socket, data) {
   console.log('handleChat: ' + JSON.stringify(data));
   if (data.roomId) {
