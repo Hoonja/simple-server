@@ -8,15 +8,15 @@ var Type = {
   MSG: 'MSG'
 };
 
-var Cmd = {
+var CMsg = {
   ROOM: 'ROOM',
-  ROOM_NEWUSER: 'ROOM_NEWUSER',
-  ROOM_EXITUSER: 'ROOM_EXITUSER',
   CONQUER_CELL: 'CONQUER_CELL'
 };
 
-var Res = {
+var SMsg = {
   ROOM_INFO: 'ROOM_INFO',
+  ROOM_NEWUSER: 'ROOM_NEWUSER',
+  ROOM_EXITUSER: 'ROOM_EXITUSER',
   CONQUER_CELL_SUCCESS: 'CONQUER_CELL_SUCCESS',
   CONQUER_CELL_FAILED: 'CONQUER_CELL_FAILED',
   UPDATE_CELL: 'UPDATE_CELL',
@@ -47,7 +47,7 @@ io.on('connection', function (socket) {
   socket.on('disconnect', function () {
     var user = removeUser(socket);
     if (user) {
-      io.emit(Type.MSG, { cmd: Cmd.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
+      io.emit(Type.MSG, { cmd: SMsg.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
     }
   });
 
@@ -90,22 +90,27 @@ function handleChat(socket, data) {
     socket.to(data.roomId).emit(Type.CHAT, {
       userId: data.userId,
       roomId: data.roomId,
-      text: data.text
+      data: {
+        text: data.text
+      }
     });
   } else {  //  서버 전체 유저들을 대상으로 채팅 알림
     io.emit(Type.CHAT, {
       userId: data.userId,
-      text: data.text
+      roomId: null,
+      data: {
+        text: data.text
+      }
     });
   }
 }
 
 function handleMsg(socket, msg) {
   switch (msg.cmd) {
-    case Cmd.ROOM:
-      processRoomMsg(socket, msg.data);
+    case CMsg.ROOM:
+      processRoomMsg(socket, msg);
       break;
-    case Cmd.CONQUER_CELL:
+    case CMsg.CONQUER_CELL:
       addMsgQueue(socket, msg);
       break;
     default:
@@ -115,7 +120,8 @@ function handleMsg(socket, msg) {
   }
 }
 
-function processRoomMsg(socket, data) {
+function processRoomMsg(socket, msg) {
+  var data = msg.data;
   socket.join(data.room.id, () => {
     registerUser(socket, data.user, data.room.id);
 
@@ -127,12 +133,16 @@ function processRoomMsg(socket, data) {
     //  입장한 사람에게 보냄 : 잘 들어왔음을 확인시키기 위함
     //  다른 사람에게 보냄 : 입장한 사람의 정보를 알림
     socket.to(room.id).emit(Type.MSG, {
-      cmd: Cmd.ROOM_NEWUSER,
-      data: data
+      cmd: SMsg.ROOM_NEWUSER,
+      userId: data.user.id,
+      roomId: data.room.id,
+      data: { user: data.user, roomUsers: room.users.length }
     });
 
     socket.emit(Type.MSG, {
-      cmd: Res.ROOM_INFO,
+      cmd: SMsg.ROOM_INFO,
+      userId: data.user.id,
+      roomId: data.room.id,
       data: { room: room }
     });
   });
@@ -232,7 +242,7 @@ function processBlock() {
   console.log('블록 정보가 갱신됩니다.[처리할 큐인덱스: ' + prevQIndex + ', Length: ' + qRequest[prevQIndex].length + ']');
 
   var qConquer = qRequest[prevQIndex].filter(function (item) {
-    return item.msg.cmd === Cmd.CONQUER_CELL;
+    return item.msg.cmd === CMsg.CONQUER_CELL;
   });
   qConquer.sort(function (a, b) {
     if (a.msg.roomId === b.msg.roomId) {
@@ -294,23 +304,25 @@ function processBlock() {
         room.value += cell.cost;
         console.log('현재 방 정보 :' + JSON.stringify(room));
         socket.to(msg.roomId).emit(Type.MSG, {
-          cmd: Res.UPDATE_CELL,
+          cmd: SMsg.UPDATE_CELL,
+          userId: msg.userId,
+          roomId: room.id,
           data: {
             cell: room.cells[cell.id],
             roomValue: room.value
           }
         });
 
-        res = Res.CONQUER_CELL_SUCCESS;
+        res = SMsg.CONQUER_CELL_SUCCESS;
       } else if (cellIndex === cell.id) { //  나머지는 모두 실패 처리
-        res = Res.CONQUER_CELL_FAILED;
+        res = SMsg.CONQUER_CELL_FAILED;
       }
 
       socket.emit(Type.MSG, {
         cmd: res,
-        data: {
-          cell: room.cells[cell.id]
-        }
+        userId: msg.userId,
+        roomId: room.id,
+        data: { cell: room.cells[cell.id] }
       });
     }
   }
@@ -327,35 +339,35 @@ function processBlock() {
       if (!restCell) {
         rooms[i].turnsLeft = LEFT_TURN;
         io.emit(Type.MSG, {
-          cmd: Res.GOTO_FINAL,
-          data: {
-            room: rooms[i]
-          }
+          cmd: SMsg.GOTO_FINAL,
+          userId: null,
+          roomId: rooms[i].id,
+          data: { room: rooms[i] }
         });
       }
     } else if (rooms[i].turnsLeft === 0) {
       io.emit(Type.MSG, {
-        cmd: Res.GAME_OVER,
-        data: {
-          room: rooms[i]
-        }
+        cmd: SMsg.GAME_OVER,
+        userId: null,
+        roomId: rooms[i].id,
+        data: { room: rooms[i] }
       });
     } else {
       rooms[i].turnsLeft--;
       if (rooms[i].turnsLeft === 0) {
         io.emit(Type.MSG, {
-          cmd: Res.GAME_OVER,
-          data: {
-            room: rooms[i]
-          }
+          cmd: SMsg.GAME_OVER,
+          userId: null,
+          roomId: rooms[i].id,
+          data: { room: rooms[i] }
         });
         rooms[i].isCompleted = true;
       } else {
         io.emit(Type.MSG, {
-          cmd: Res.GOTO_FINAL,
-          data: {
-            room: rooms[i]
-          }
+          cmd: SMsg.GOTO_FINAL,
+          userId: null,
+          roomId: rooms[i].id,
+          data: { room: rooms[i] }
         });
       }
     }
