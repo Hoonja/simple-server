@@ -9,7 +9,7 @@ var Type = {
 };
 
 var CMsg = {
-  ROOM: 'ROOM',
+  ROOM_ENTER: 'ROOM_ENTER',
   CONQUER_CELL: 'CONQUER_CELL'
 };
 
@@ -47,7 +47,7 @@ io.on('connection', function (socket) {
   socket.on('disconnect', function () {
     var user = removeUser(socket);
     if (user) {
-      io.emit(Type.MSG, { cmd: SMsg.ROOM_EXITUSER, userId: user.id, roomId: user.roomid });
+      io.emit(Type.MSG, { cmd: SMsg.ROOM_EXITUSER, userId: user.id, roomId: user.roomId });
     }
   });
 
@@ -62,8 +62,9 @@ curQIndex = 0;
 
 setInterval(processBlock, BLOCK_INTERVAL);
 
-http.listen(getPortNumber(), function () {
-  console.log('listening on *:', getPortNumber());
+var portNo = getPortNumber();
+http.listen(portNo, function () {
+  console.log('listening on *:', portNo);
 });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -107,7 +108,7 @@ function handleChat(socket, data) {
 
 function handleMsg(socket, msg) {
   switch (msg.cmd) {
-    case CMsg.ROOM:
+    case CMsg.ROOM_ENTER:
       processRoomMsg(socket, msg);
       break;
     case CMsg.CONQUER_CELL:
@@ -121,28 +122,27 @@ function handleMsg(socket, msg) {
 }
 
 function processRoomMsg(socket, msg) {
-  var data = msg.data;
-  socket.join(data.room.id, () => {
-    registerUser(socket, data.user, data.room.id);
+  socket.join(msg.roomId, () => {
+    registerUser(socket, msg.data.user, msg.roomId);
 
-    console.log(data.user.id + '님이 ' + data.room.id + '번 방에 입장했습니다.(socketId: ' + socket.id + ')');
-    var room = getRoomInfo(data.room.id, data.room.width, data.room.height);
-    enterRoom(room, data.user.id);
+    console.log(msg.userId + '님이 ' + msg.roomId + '번 방에 입장하려고 합니다.(socketId: ' + socket.id + ')');
+    var room = getRoomInfo(msg.data.room);
+    enterRoom(room, msg.userId);
 
     //  해당 방의 모든 멤버에게 입장을 알림
     //  입장한 사람에게 보냄 : 잘 들어왔음을 확인시키기 위함
     //  다른 사람에게 보냄 : 입장한 사람의 정보를 알림
     socket.to(room.id).emit(Type.MSG, {
       cmd: SMsg.ROOM_NEWUSER,
-      userId: data.user.id,
-      roomId: data.room.id,
-      data: { user: data.user, roomUsers: room.users.length }
+      userId: msg.userId,
+      roomId: msg.roomId,
+      data: { user: msg.data.user, roomUsers: room.users.length }
     });
 
     socket.emit(Type.MSG, {
       cmd: SMsg.ROOM_INFO,
-      userId: data.user.id,
-      roomId: data.room.id,
+      userId: msg.userId,
+      roomId: msg.roomId,
       data: { room: room }
     });
   });
@@ -153,15 +153,15 @@ function addMsgQueue(socket, msg) {
   qRequest[curQIndex].push({ socket: socket, msg: msg });
 }
 
-function getRoomInfo(roomId, width, height) {
-  console.log(roomId + '번 방 검색..');
+function getRoomInfo(room) {
+  console.log(room.id + '번 방 검색..');
   for (var i = 0; i < rooms.length; i++) {
-    if (rooms[i].id === roomId) {
-      console.log(roomId + '번 방 검색 성공: ' + JSON.stringify(rooms[i]));
+    if (rooms[i].id === room.id) {
+      console.log(room.id + '번 방 검색 성공: ' + JSON.stringify(rooms[i]));
       return rooms[i];
     }
   }
-  console.log(roomId + '번 방이 존재하지 않아, 새로 생성(width: ' + width + ', height: ' + height + ')');
+  console.log(room.id + '번 방이 존재하지 않아, 새로 생성(width: ' + room.width + ', height: ' + room.height + ')');
 
   function initCells(width, height) {
     if (typeof width === 'string') {
@@ -177,11 +177,11 @@ function getRoomInfo(roomId, width, height) {
     return cells;
   }
   rooms.push({
-    id: roomId,
-    cells: initCells(width, height),
+    id: room.id,
+    cells: initCells(room.width, room.height),
     users: [],
-    width: width,
-    height: height,
+    width: room.width,
+    height: room.height,
     value: 0,
     isCompleted: false,
     turnsLeft: -1
@@ -198,18 +198,42 @@ function removeRoom(roomId) {
 }
 
 function enterRoom(room, userId) {
-  for (var i = 0; i < room.users.length; i++) {
-    if (room.users[i] === userId) {
-      return;
-    }
+  var user = room.users.find(function (item) {    
+    return item === userId;
+  });
+  
+  if (!user) {
+    room.users.push(userId);
+    console.log(userId + ' 님이 ' + room.id + ' 번 방에 입장했습니다.');
+  } else {
+    console.warn(userId + ' 님은 ' + room.id + ' 번 방에 이미 입장해 있습니다.' + JSON.stringify(room.users));
   }
-  room.users.push(userId);
+}
+
+function exitRoom(roomId, userId) {
+  var room = rooms.find(function(item) {
+    return item.id === roomId;
+  });
+
+  if (room) {
+    for (var i = 0; i < room.users.length; i++) {
+      if (room.users[i] === userId) {
+        console.log('방에서 나감 [roomId: ' + roomId + ', userId: ' + userId + ']');
+        room.users.splice(i, 1);
+        return;
+      }
+    }
+    console.warn('방에서 유저를 찾지 못함 [roomId: ' + roomId + ', userId: ' + userId + ']');
+  } else {
+    console.warn('나갈 방이 없음. [roomId: ' + roomId + ', userId: ' + userId + ']');
+  }
 }
 
 function registerUser(socket, user, roomId) {
   for (var i = 0; i < users.length; i++) {
-    if (users[i].id === user.id) {
+    if (users[i].id === user.id && users[i].roomId === roomId) {
       users[i].socket = socket;
+      console.log('User[userId: ' + user.id + ', roomId: ' + roomId + ']의 socketId가 갱신됨');
       return;
     }
   }
@@ -221,6 +245,7 @@ function registerUser(socket, user, roomId) {
     socket: socket,
     roomId: roomId
   });
+  console.log('User[userId: ' + user.id + ', roomId: ' + roomId + ']가 userDB에 등록됨');
 }
 
 function removeUser(socket) {
@@ -229,7 +254,8 @@ function removeUser(socket) {
   for (var i = 0; i < users.length; i++) {
     if (users[i].socket.id === socket.id) {
       user = users.splice(i, 1)[0];
-      console.warn('User[' + user.id + '] is removed');
+      exitRoom(user.roomId, user.id);
+      console.warn('User[userId: ' + user.id + ', roomId: ' + user.roomId + ']가 userDB에서 삭제됨');
       break;
     }
   }
