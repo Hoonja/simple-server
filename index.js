@@ -122,10 +122,13 @@ function handleMsg(socket, msg) {
 }
 
 function processRoomMsg(socket, msg) {
-  socket.join(msg.roomId, () => {
-    registerUser(socket, msg.data.user, msg.roomId);
+  registerUser(socket, msg.data.user, msg.roomId);
+  console.log(msg.userId + '님이 ' + msg.roomId + '번 방에 입장하려고 합니다.(socketId: ' + socket.id + ')');
 
-    console.log(msg.userId + '님이 ' + msg.roomId + '번 방에 입장하려고 합니다.(socketId: ' + socket.id + ')');
+  var rms = Object.keys(socket.rooms);
+  console.log('socket.rooms: ' + JSON.stringify(rms));
+
+  socket.join(msg.roomId, () => {
     var room = getRoomInfo(msg.data.room);
     enterRoom(room, msg.userId);
 
@@ -153,14 +156,23 @@ function addMsgQueue(socket, msg) {
   qRequest[curQIndex].push({ socket: socket, msg: msg });
 }
 
-function getRoomInfo(room) {
-  console.log(room.id + '번 방 검색..');
+function findRoom(roomId) {
+  console.log(roomId + '번 방 검색..');
   for (var i = 0; i < rooms.length; i++) {
-    if (rooms[i].id === room.id) {
-      console.log(room.id + '번 방 검색 성공: ' + JSON.stringify(rooms[i]));
+    if (rooms[i].id === roomId) {
+      console.log(roomId + '번 방 검색 성공: ' + JSON.stringify(rooms[i]));
       return rooms[i];
     }
   }
+  return null;
+}
+
+function getRoomInfo(room) {
+  var roomFound = findRoom(room.id);
+  if (roomFound) {
+    return roomFound;
+  }
+
   console.log(room.id + '번 방이 존재하지 않아, 새로 생성(width: ' + room.width + ', height: ' + room.height + ')');
 
   function initCells(width, height) {
